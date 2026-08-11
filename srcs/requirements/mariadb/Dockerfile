@@ -6,6 +6,6 @@ WORKDIR /
 
 RUN chown mysql:mysql /var/lib/mysql
 
-COPY ./tools/main.sh main.sh
+COPY ./tools/main.sh ./main.sh
 
-ENTRYPOINT ["./main.sh"]
+ENTRYPOINT ["/main.sh"]
