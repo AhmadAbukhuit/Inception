@@ -1,30 +1,76 @@
 #!/bin/sh
-set -eu 
+set -eu
+
+mkdir -p "$(dirname "$SOCKET")"
+chown mysql:mysql "$(dirname "$SOCKET")"
 
 if [ ! -d "$DATADIR/mysql" ]; then
-	echo "setup the mariadb data directory"
-	mariadb-install-db --user=mysql \
-		--datadir="$DATADIR" \
-		--skip-test-db
+  echo "setting up MariaDB data directory"
 
-	echo "running the mariadbd...."
-	mariadbd \
-	--user=mysql \
-	--datadir="$DATADIR" \
-	--bootstrap <<EOF
-CREATE DATABASE IF NOT EXISTS ${DB_NAME};
-
-CREATE USER IF NOT EXISTS '${DB_USER}'@'%'
-    IDENTIFIED BY '${DB_PASSWORD}';
-
-GRANT ALL PRIVILEGES
-    ON ${DB_NAME}.*
-    TO '${DB_USER}'@'%';
-EOF
-fi
-
-exec mariadbd \
+  mariadb-install-db \
     --user=mysql \
     --datadir="$DATADIR" \
-    --bind-address=0.0.0.0 \
-    --port=3306
+    --skip-test-db
+
+  echo "starting temporary MariaDB server"
+
+  mariadbd \
+    --user=mysql \
+    --datadir="$DATADIR" \
+    --socket="$SOCKET" \
+    --skip-networking &
+
+  pid=$!
+
+  ready=0
+
+  for i in $(seq 0 6); do
+    if mariadb-admin \
+      --protocol=socket \
+      --socket="$SOCKET" \
+      ping >/dev/null 2>&1; then
+      ready=1
+      break
+    fi
+
+    if ! kill -0 "$pid" 2>/dev/null; then
+      echo "temporary MariaDB server exited unexpectedly" >&2
+      wait "$pid" || true
+      exit 1
+    fi
+
+    sleep 5
+  done
+
+  if [ "$ready" -ne 1 ]; then
+    echo "MariaDB failed to become ready" >&2
+    kill "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+    exit 1
+  fi
+
+  echo "bootstrapping database"
+
+  envsubst <bootstrap.sql >/tmp/bootstrap.sql
+
+  mariadb \
+    --protocol=socket \
+    --socket="$SOCKET" \
+    -u root </tmp/bootstrap.sql
+
+  rm -f /tmp/bootstrap.sql
+
+  mariadb-admin \
+    --protocol=socket \
+    --socket="$SOCKET" \
+    -u root shutdown
+
+  wait "$pid"
+fi
+
+echo "starting MariaDB"
+
+exec mariadbd \
+  --user=mysql \
+  --datadir="$DATADIR" \
+  --port=3306
