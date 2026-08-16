@@ -8,6 +8,8 @@ services:
       - .env
     networks:
       - inception
+    volumes:
+      - mariadb-vol:/var/lib/mysql
 
   nginx:
     build: ./requirements/nginx
@@ -18,6 +20,8 @@ services:
       - "443:443"
     networks:
       - inception
+    volumes:
+      - wordpress-vol:/usr/www
 
   wordpress:
     build: ./requirements/wordpress
@@ -26,8 +30,23 @@ services:
       - .env
     networks:
       - inception
+    volumes:
+      - wordpress-vol:/usr/share/webapps
 
 networks:
   inception:
     driver: bridge
 
+volumes:
+  wordpress-vol:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /home/ahmad/data/wordpress
+  mariadb-vol:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /home/ahmad/data/mysql

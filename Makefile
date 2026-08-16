@@ -5,4 +5,5 @@ run: docker-compose.yml
 stop: docker-compose.yml
 	docker compose down
 
-fclean: docker system prune -a && docker volume prune && docker network prune
+fclean:
+	docker system prune -a && docker volume prune && docker network prune
