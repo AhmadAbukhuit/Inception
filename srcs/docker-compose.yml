@@ -10,28 +10,56 @@ services:
       - inception
     volumes:
       - mariadb-vol:/var/lib/mysql
+    secrets:
+      - db_password
+      - db_root_password
+    healthcheck:
+      test: ["CMD-SHELL", "mariadb-admin ping --host=127.0.0.1 --port=3306 --silent"]
+      start_period: 5s
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    restart: on-failure
+
 
   nginx:
     build: ./requirements/nginx
     container_name: nginx
-    expose:
-      - "9000"
     ports:
       - "443:443"
     networks:
       - inception
     volumes:
-      - wordpress-vol:/usr/www
+      - wordpress-vol:/usr/www/wordpress:ro
+    depends_on:
+      wordpress:
+        condition: service_healthy
+    restart: on-failure
 
   wordpress:
     build: ./requirements/wordpress
     container_name: wordpress
+    expose:
+      - "9000"
     env_file:
       - .env
     networks:
       - inception
     volumes:
-      - wordpress-vol:/usr/share/webapps
+      - wordpress-vol:/var/www/html
+    secrets:
+      - db_password
+      - db_root_password
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    healthcheck:
+     test: ["CMD", "nc", "-z", "127.0.0.1", "9000"]
+     interval: 10s
+     timeout: 3s
+     retries: 3
+     start_period: 10s
+    restart: on-failure
 
 networks:
   inception:
@@ -50,3 +78,8 @@ volumes:
       type: none
       o: bind
       device: /home/ahmad/data/mysql
+secrets:
+  db_password:
+    file: ./secrets/db_password.txt
+  db_root_password:
+    file: ./secrets/db_root_password.txt

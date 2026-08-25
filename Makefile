@@ -1,9 +1,9 @@
 .PHONY:
-run: docker-compose.yml
-	docker compose up -d
+run: ./srcs/docker-compose.yml
+	docker compose  -f ./srcs/docker-compose.yml --env-file ./srcs/.env up -d
 
-stop: docker-compose.yml
-	docker compose down
+stop: ./srcs/docker-compose.yml
+	docker compose  -f ./srcs/docker-compose.yml --env-file ./srcs/.env down
 
 fclean:
 	docker system prune -a && docker volume prune && docker network prune

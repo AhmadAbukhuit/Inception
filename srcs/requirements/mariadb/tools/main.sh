@@ -4,6 +4,10 @@ set -eu
 mkdir -p "$(dirname "$SOCKET")"
 chown mysql:mysql "$(dirname "$SOCKET")"
 
+WP_PASS="$(cat /run/secrets/db_password)"
+WP_ADMIN_PASS="$(cat /run/secrets/db_root_password)"
+export WP_PASS WP_ADMIN_PASS
+
 if [ ! -d "$DATADIR/mysql" ]; then
   echo "setting up MariaDB data directory"
 
