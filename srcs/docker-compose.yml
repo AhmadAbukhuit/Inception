@@ -14,7 +14,7 @@ services:
       - db_password
       - db_root_password
     healthcheck:
-      test: ["CMD-SHELL", "mariadb-admin ping --host=127.0.0.1 --port=3306 --silent"]
+      test: ["CMD-SHELL", "mariadb-admin ping --host=127.0.0.1 --port=3306 --user=healthcheck --silent"]
       start_period: 5s
       interval: 10s
       timeout: 10s
@@ -30,7 +30,7 @@ services:
     networks:
       - inception
     volumes:
-      - wordpress-vol:/usr/www/wordpress:ro
+      - wordpress-vol:/usr/src/wordpress:ro
     depends_on:
       wordpress:
         condition: service_healthy
@@ -46,10 +46,9 @@ services:
     networks:
       - inception
     volumes:
-      - wordpress-vol:/var/www/html
+      - wordpress-vol:/usr/src/wordpress
     secrets:
       - db_password
-      - db_root_password
     depends_on:
       mariadb:
         condition: service_healthy

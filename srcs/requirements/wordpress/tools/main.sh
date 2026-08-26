@@ -2,7 +2,8 @@
 set -eu
 
 WP_PASS="$(cat /run/secrets/db_password)"
-WP_ADMIN_PASS="$(cat /run/secrets/db_root_password)"
-export WP_PASS WP_ADMIN_PASS
+export WP_PASS
+
+chown -R nobody:nobody /usr/src/wordpress
 
 exec php-fpm84 -F
