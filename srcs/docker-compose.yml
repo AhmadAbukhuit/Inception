@@ -49,6 +49,7 @@ services:
       - wordpress-vol:/usr/src/wordpress
     secrets:
       - db_password
+      - db_root_password
     depends_on:
       mariadb:
         condition: service_healthy
@@ -70,13 +71,13 @@ volumes:
     driver_opts:
       type: none
       o: bind
-      device: /home/ahmad/data/wordpress
+      device: /home/akamamji/data/wordpress
   mariadb-vol:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: /home/ahmad/data/mysql
+      device: /home/akamamji/data/mysql
 secrets:
   db_password:
     file: ./secrets/db_password.txt
