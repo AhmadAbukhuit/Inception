@@ -24,6 +24,21 @@ jobs:
     - name: Prepare environment variables
       run: cp srcs/.env.example srcs/.env
 
+    - name: Prepare secrets
+      working-directory: srcs
+      run: |
+        mkdir -p secrets
+        echo "${{ secrets.DB_PASSWORD }}" > secrets/db_password.txt
+        echo "${{ secrets.DB_ROOT_PASSWORD }}" > secrets/db_root_password.txt
+
+    - name: Create bind mount directories
+      run: |
+        # Creates the hardcoded host paths used by your docker-compose local volumes
+        sudo mkdir -p /home/akamamji/data/wordpress
+        sudo mkdir -p /home/akamamji/data/mysql
+        sudo chmod 777 /home/akamamji/data/wordpress
+        sudo chmod 777 /home/akamamji/data/mysql
+
     - name: Build docker-compose services
       working-directory: srcs
       run: docker compose build
