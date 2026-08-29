@@ -1,0 +1,97 @@
+name: Test Docker Compose
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+# Best Practice: Explicitly set minimum permissions for security
+permissions:
+  contents: read
+  issues: write # Required for creating issues automatically on failure
+
+jobs:
+  test-compose:
+    runs-on: ubuntu-latest
+    # Added a timeout to prevent runaway jobs from consuming CI minutes
+    timeout-minutes: 15
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+    - name: Prepare environment variables and secrets
+      run: |
+        cp srcs/.env.example srcs/.env
+        cp -r srcs/secrets.example srcs/secrets
+
+    - name: Create bind mount directories
+      run: |
+        # Creates the hardcoded host paths used by your docker-compose local volumes
+        sudo mkdir -p /home/akamamji/data/wordpress
+        sudo mkdir -p /home/akamamji/data/mysql
+        sudo chmod 777 /home/akamamji/data/wordpress
+        sudo chmod 777 /home/akamamji/data/mysql
+
+    - name: Build docker-compose services
+      working-directory: srcs
+      run: docker compose build
+
+    - name: Start docker-compose services
+      working-directory: srcs
+      run: docker compose up -d
+
+    - name: Wait for services to initialize
+      # MariaDB and WordPress can sometimes take a bit longer to initialize
+      run: sleep 30
+
+    - name: Check container statuses
+      working-directory: srcs
+      run: |
+        # Show all containers for debugging in logs
+        docker compose ps -a
+        
+        # Robust check for any exited containers using Docker's native flags
+        EXITED_CONTAINERS=$(docker compose ps -q --status exited | wc -l)
+        if [ "$EXITED_CONTAINERS" -gt 0 ]; then
+          echo "::error::One or more containers exited unexpectedly."
+          docker compose logs
+          exit 1
+        fi
+
+        # Check that all expected containers are actually running
+        # We expect 3 containers: mariadb, wordpress, nginx
+        RUNNING_CONTAINERS=$(docker compose ps -q --status running | wc -l)
+        EXPECTED=3
+        if [ "$RUNNING_CONTAINERS" -ne "$EXPECTED" ]; then
+          echo "::error::Expected $EXPECTED running containers, but found $RUNNING_CONTAINERS."
+          docker compose logs
+          exit 1
+        fi
+        
+        echo "All containers are running successfully."
+
+    - name: Create Issue on Failure
+      if: failure()
+      working-directory: srcs
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        echo "The Docker Compose tests failed for commit \`${{ github.sha }}\`." > ../issue_body.md
+        echo "" >> ../issue_body.md
+        echo "**Workflow Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> ../issue_body.md
+        echo "" >> ../issue_body.md
+        echo "### Docker Compose Logs" >> ../issue_body.md
+        echo '```' >> ../issue_body.md
+        docker compose logs --tail=200 >> ../issue_body.md || echo "No logs available or containers failed to build." >> ../issue_body.md
+        echo '```' >> ../issue_body.md
+        
+        cd ..
+        gh issue create --title "🚨 CI Failure: Docker Compose Tests" --body-file issue_body.md
+
+    - name: Teardown and cleanup
+      # Always run this step even if previous steps failed
+      if: always()
+      working-directory: srcs
+      run: docker compose down -v
